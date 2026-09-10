@@ -1,0 +1,14 @@
+{
+  "name": "why-isnt-it-selling",
+  "displayName": "Why Isn't It Selling",
+  "version": "0.1.0",
+  "description": "Diagnose why a shipped product is not selling, and get the proven moves that fit it, each one traceable to a real source.",
+  "author": {
+    "name": "maxxthemate-png",
+    "url": "https://github.com/maxxthemate-png"
+  },
+  "homepage": "https://github.com/maxxthemate-png/why-isnt-it-selling",
+  "repository": "https://github.com/maxxthemate-png/why-isnt-it-selling",
+  "license": "MIT",
+  "skills": "./skills/"
+}

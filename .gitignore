@@ -1,0 +1,21 @@
+# secrets never get committed
+.env
+.env.*
+!.env.example
+*.pem
+*.token
+secrets/
+
+# local test credentials for the private-repo install test
+.testcreds/
+
+__pycache__/
+*.pyc
+.DS_Store
+node_modules/
+
+# private project instructions: strategy, pricing, gate. Never ships public.
+CLAUDE.md
+
+# staged notes and local test credentials, never public
+.private/

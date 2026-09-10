@@ -1,0 +1,24 @@
+{
+  "name": "why-isnt-it-selling",
+  "description": "Diagnostics for shipped products that are not selling, built from 4,300 verified cases plus the 11 tactics that failed adversarial refutation.",
+  "owner": {
+    "name": "maxxthemate-png",
+    "url": "https://github.com/maxxthemate-png"
+  },
+  "plugins": [
+    {
+      "name": "why-isnt-it-selling",
+      "source": "./",
+      "displayName": "Why Isn't It Selling",
+      "description": "Diagnose why a shipped product is not selling, and get the proven moves that fit it, each one traceable to a real source.",
+      "category": "productivity",
+      "tags": [
+        "marketing",
+        "monetization",
+        "churn",
+        "distribution",
+        "launch"
+      ]
+    }
+  ]
+}

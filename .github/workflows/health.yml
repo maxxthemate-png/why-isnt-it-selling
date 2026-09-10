@@ -1,0 +1,104 @@
+name: health
+
+# Verifies the shipped product still works, from the outside, on a schedule.
+# Uses only the built-in GITHUB_TOKEN: no API key, no secrets to add.
+# Opens an issue when something breaks, so a failure is visible without watching CI.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Manifests are valid JSON and structurally sound
+        run: |
+          python3 - <<'PY'
+          import json, sys, pathlib
+          fails = []
+          p = json.load(open('.claude-plugin/plugin.json'))
+          m = json.load(open('.claude-plugin/marketplace.json'))
+          if not p.get('name'): fails.append('plugin.json missing name')
+          if not m.get('owner', {}).get('name'): fails.append('marketplace.json missing owner.name')
+          if not m.get('plugins'): fails.append('marketplace.json has no plugins[]')
+          for entry in m.get('plugins', []):
+              if not entry.get('name'): fails.append('a marketplace plugin entry has no name')
+              if not entry.get('source'): fails.append(f"{entry.get('name')} has no source")
+          # every skill must have frontmatter with a name and a description
+          for sk in pathlib.Path('skills').glob('*/SKILL.md'):
+              text = sk.read_text()
+              if not text.startswith('---'): fails.append(f'{sk} has no frontmatter')
+              head = text.split('---')[1] if '---' in text[3:] else ''
+              if 'name:' not in head: fails.append(f'{sk} frontmatter has no name')
+              if 'description:' not in head: fails.append(f'{sk} frontmatter has no description')
+              if 'allowed-tools:' not in head: fails.append(f'{sk} has no allowed-tools, so the no-telemetry promise is unenforced')
+          print('\n'.join(fails) if fails else 'manifests and skills OK')
+          sys.exit(1 if fails else 0)
+          PY
+
+      - name: No owner-specific content leaked into the public repo
+        run: |
+          # Exclude this workflow: it necessarily contains the very words it greps for.
+          if grep -rniE "Undercut|GhostCred|IdeaCoach|TitleFiled|MaxResale|LedgerClear|Overseer|Nuvent" \
+               --include='*.md' --include='*.json' --include='*.yml' \
+               --exclude='health.yml' . ; then
+            echo "::error::owner-specific content found in the public repo"; exit 1
+          fi
+          echo "clean"
+
+      - name: CLAUDE.md must never be committed here
+        run: |
+          if [ -f CLAUDE.md ]; then
+            echo "::error::CLAUDE.md is present in the public repo. It carries pricing and strategy."; exit 1
+          fi
+          echo "clean"
+
+      - name: Every cited source URL still resolves
+        run: |
+          grep -rhoE 'https?://[^ )"`>|]+' skills/ README.md \
+            | sed 's/[.,;]$//' \
+            | grep -v shields.io | grep -v raw.githubusercontent \
+            | sort -u > urls.txt
+          echo "checking $(wc -l < urls.txt) unique URLs"
+          dead=0
+          while read -r u; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 20 -A 'Mozilla/5.0' "$u" || echo 000)
+            case "$code" in
+              2*|3*) ;;
+              # 403/429 from a bot-blocking host is not a dead link
+              403|429) echo "  skipped (bot-blocked $code): $u" ;;
+              *) echo "  DEAD $code $u"; dead=$((dead+1)) ;;
+            esac
+          done < urls.txt
+          echo "dead_links=$dead" >> "$GITHUB_ENV"
+          [ "$dead" -eq 0 ] || echo "::warning::$dead cited URLs are dead"
+
+      - name: Payment links still reachable
+        run: |
+          for u in $(grep -ohE 'https://buy\.stripe\.com/[A-Za-z0-9]+' README.md | sort -u); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 20 "$u")
+            echo "  $code  $u"
+            [ "${code:0:1}" = "2" ] || { echo "::error::payment link is not reachable: $u"; exit 1; }
+          done
+
+      - name: Open an issue if anything broke
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "Health check failed $(date -u +%Y-%m-%d)" \
+            --body "The scheduled health check failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          This checks the things that silently break a live product: manifest validity, leaked
+          owner-specific content, a committed CLAUDE.md, dead source URLs, and unreachable payment
+          links. A payment-link failure means buyers cannot pay." \
+            --label bug || true

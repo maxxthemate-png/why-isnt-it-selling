@@ -1,0 +1,56 @@
+name: traffic-ledger
+
+# The GitHub traffic API only returns a rolling 14-day window, so this job runs
+# nightly and unions each reading into stats/ledger.json by date. That is what
+# makes a cumulative multi-week count possible at all.
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: traffic-ledger
+  cancel-in-progress: false
+
+jobs:
+  ledger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch traffic
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The traffic endpoints require push access. If the token is ever
+          # scoped down, log it and carry on rather than going red every night.
+          gh api "repos/${GITHUB_REPOSITORY}/traffic/clones" > clones.json \
+            || { echo "::warning::clones endpoint unavailable, keeping last known"; echo '{}' > clones.json; }
+          gh api "repos/${GITHUB_REPOSITORY}/traffic/views" > views.json \
+            || { echo "::warning::views endpoint unavailable, keeping last known"; echo '{}' > views.json; }
+          stars=$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.stargazers_count' || echo "")
+          echo "STARS=${stars}" >> "$GITHUB_ENV"
+
+      - name: Merge into cumulative ledger
+        run: |
+          python3 scripts/merge-traffic.py \
+            --ledger stats/ledger.json \
+            --clones clones.json \
+            --views views.json \
+            ${STARS:+--stars "$STARS"}
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add stats/
+          if git diff --staged --quiet; then
+            echo "no change"
+          else
+            git commit -m "chore(stats): nightly traffic ledger [skip ci]"
+            git push
+          fi
