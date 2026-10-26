@@ -24,10 +24,19 @@ jobs:
 
       - name: Fetch traffic
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN can NEVER read /traffic/* (GitHub product limitation,
+          # not a permissions: block issue) -- it 403s every time regardless of
+          # the `permissions:` above. Confirmed 2026-10-12: this silently wrote
+          # zeros to the ledger on all 33 runs since 2026-09-10 while reporting
+          # green. A real PAT with repo scope (classic, or fine-grained with
+          # Contents:read + Administration:read) is required; store it as repo
+          # secret TRAFFIC_PAT. Falls back to GITHUB_TOKEN (which will 403) so
+          # this never hard-fails if the secret is unset.
+          GH_TOKEN: ${{ secrets.TRAFFIC_PAT || secrets.GITHUB_TOKEN }}
         run: |
-          # The traffic endpoints require push access. If the token is ever
-          # scoped down, log it and carry on rather than going red every night.
+          # If the token lacks traffic scope, log it and carry on rather than
+          # going red every night -- but note this means a green run here is
+          # NOT proof the numbers are real; check stats/ledger.json directly.
           gh api "repos/${GITHUB_REPOSITORY}/traffic/clones" > clones.json \
             || { echo "::warning::clones endpoint unavailable, keeping last known"; echo '{}' > clones.json; }
           gh api "repos/${GITHUB_REPOSITORY}/traffic/views" > views.json \
