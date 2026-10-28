@@ -65,6 +65,12 @@ Work down this list and stop at the first match. Earlier failures make later one
 diagnose, and every other recommendation is wasted until it is fixed. Say this plainly rather than
 softening it.
 
+**Known gap:** a product that is technically purchasable but mispriced for its buyer passes Q5 and
+gets filed under POSITIONING, when the real fix is a pricing change, not a message change. The four
+gates are direct answers rather than inferred symptoms, so they do not confuse BILLING with
+ACTIVATION or POSITIONING, but pricing and positioning sit close enough together that this tier
+cannot tell them apart. Flag it to the person rather than silently picking one.
+
 State the one mode you picked, and say in a sentence which answer decided it.
 
 ### Step 3: pull the cards that fit
